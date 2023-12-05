@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
@@ -10,13 +11,25 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	"github.com/joho/godotenv"
+	"github.com/leguzman/rss-project/internal/database"
+	_ "github.com/lib/pq"
 )
+
+type apiConfig struct {
+	DB *database.Queries
+}
 
 func main() {
 	godotenv.Load()
 	port := os.Getenv("PORT")
 	fmt.Println("Port: ", port)
-
+	conn, err := sql.Open("postgres", os.Getenv("DB_URL"))
+	if err != nil {
+		log.Fatal("Can't connect to database: ", err)
+	}
+	apiCfg := apiConfig{
+		DB: database.New(conn),
+	}
 	router := chi.NewRouter()
 	router.Use(middleware.Logger)
 	router.Use(cors.Handler(cors.Options{
@@ -34,6 +47,7 @@ func main() {
 	v1Router := chi.NewRouter()
 	v1Router.Get("/healthz", handlerReadiness)
 	v1Router.Get("/err", handlerError)
+	v1Router.Post("/users", apiCfg.handlerCreateUser)
 	router.Mount("/v1", v1Router)
 
 	server := &http.Server{
@@ -41,7 +55,7 @@ func main() {
 		Addr:    ":" + port,
 	}
 
-	err := server.ListenAndServe()
+	err = server.ListenAndServe()
 	if err != nil {
 		log.Fatal(err)
 	}
