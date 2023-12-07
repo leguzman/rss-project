@@ -37,7 +37,7 @@ func main() {
 	go startScraping(apiCfg.DB, 10, time.Minute)
 
 	server := &http.Server{
-		Handler: GetRouter(apiCfg),
+		Handler: getRouter(apiCfg),
 		Addr:    ":" + port,
 	}
 
