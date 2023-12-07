@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -20,6 +21,12 @@ type apiConfig struct {
 }
 
 func main() {
+	//	feed, err := urlToFeed("https://wagslane.dev/index.xml")
+	//	if err != nil {
+	//		log.Fatal(err)
+	//	}
+	//	fmt.Println(feed)
+
 	godotenv.Load()
 	port := os.Getenv("PORT")
 	fmt.Println("Port: ", port)
@@ -30,6 +37,7 @@ func main() {
 	apiCfg := apiConfig{
 		DB: database.New(conn),
 	}
+	go startScraping(apiCfg.DB, 10, time.Minute)
 	router := chi.NewRouter()
 	router.Use(middleware.Logger)
 	router.Use(cors.Handler(cors.Options{

@@ -44,6 +44,7 @@ func (apiCfg *apiConfig) handlerGetFeedFollows(w http.ResponseWriter, r *http.Re
 	}
 	respondWithJson(w, 200, DBFeedFollowsToFeedFollows(feedFollows))
 }
+
 func (apiCfg *apiConfig) handlerDeleteFeedFollow(w http.ResponseWriter, r *http.Request, user database.User) {
 	feedFellowIDStr := chi.URLParam(r, "feedFellowID")
 	feedFollowID, err := uuid.Parse(feedFellowIDStr)
