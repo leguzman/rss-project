@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"time"
@@ -28,9 +27,8 @@ func main() {
 	port := os.Getenv("PORT")
 	fmt.Println("Port: ", port)
 	conn, err := sql.Open("postgres", os.Getenv("DB_URL"))
-	if err != nil {
-		log.Fatal("Can't connect to database: ", err)
-	}
+	handleError(err, "Can't connect to database: %v")
+
 	apiCfg := apiConfig{
 		DB: database.New(conn),
 	}
@@ -42,7 +40,5 @@ func main() {
 	}
 
 	err = server.ListenAndServe()
-	if err != nil {
-		log.Fatal(err)
-	}
+	handleError(err, "Could not start server: %v")
 }

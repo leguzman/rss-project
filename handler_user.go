@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -39,13 +40,20 @@ func (apiCfg *apiConfig) handlerGetUser(w http.ResponseWriter, r *http.Request, 
 }
 
 func (apiCfg *apiConfig) handlerGetUserPosts(w http.ResponseWriter, r *http.Request, user database.User) {
+	limitStr := r.URL.Query().Get("limit")
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil {
+		respondWithError(w, 400, fmt.Sprintf("Couldn't parse limit: %v", err))
+		return
+	}
 	posts, err := apiCfg.DB.GetUserPosts(r.Context(), database.GetUserPostsParams{
 		UserID: user.ID,
-		Limit:  10,
+		Limit:  int32(limit),
 	})
 	if err != nil {
 		respondWithError(w, 400, fmt.Sprintf("Couldn't get posts: %v", err))
 		return
 	}
-	respondWithJson(w, 200, DBPostsToPosts(posts))
+	response := WrappedSlice{Results: DBPostsToPosts(posts), Size: len(posts)}
+	respondWithJson(w, 200, response)
 }
