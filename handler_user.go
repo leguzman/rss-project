@@ -43,8 +43,7 @@ func (apiCfg *apiConfig) handlerGetUserPosts(w http.ResponseWriter, r *http.Requ
 	limitStr := r.URL.Query().Get("limit")
 	limit, err := strconv.Atoi(limitStr)
 	if err != nil {
-		respondWithError(w, 400, fmt.Sprintf("Couldn't parse limit: %v", err))
-		return
+		limit = 100
 	}
 	posts, err := apiCfg.DB.GetUserPosts(r.Context(), database.GetUserPostsParams{
 		UserID: user.ID,

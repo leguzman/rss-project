@@ -1,4 +1,4 @@
 .vscode/
 rss-project
 .env
-
+vendor/
