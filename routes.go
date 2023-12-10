@@ -38,6 +38,7 @@ func getRouter(apiCfg apiConfig) chi.Router {
 	v1Router.Delete("/feed_follows/{feedFollowID}", apiCfg.middlewareAuth(apiCfg.handlerDeleteFeedFollow))
 
 	v1Router.Get("/posts", apiCfg.middlewareAuth(apiCfg.handlerGetUserPosts))
+	v1Router.Get("/post", apiCfg.middlewareAuth(apiCfg.handlerFilterUserPosts))
 
 	router.Mount("/v1", v1Router)
 

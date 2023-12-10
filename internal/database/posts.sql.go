@@ -55,6 +55,68 @@ func (q *Queries) CreatePost(ctx context.Context, arg CreatePostParams) (Post, e
 	return i, err
 }
 
+const filterUserPosts = `-- name: FilterUserPosts :many
+SELECT posts.id, posts.created_at, posts.updated_at, posts.title, posts.description, posts.published_at, posts.url, posts.feed_id FROM posts
+JOIN feed_follows ON feed_follows.feed_id = posts.feed_id
+WHERE feed_follows.user_id=$1
+AND ($3::text = '' OR posts.title ILIKE '%' || $3 || '%')
+AND ($4::text = '' OR posts.description ILIKE '%' || $4 || '%')
+AND ($5::TIMESTAMP = '0001-01-01' OR posts.published_at <= $5 )
+AND ($6::TIMESTAMP = '0001-01-01' OR posts.published_at >= $6 )
+ORDER BY posts.published_at
+LIMIT $2
+`
+
+type FilterUserPostsParams struct {
+	UserID      uuid.UUID
+	Limit       int32
+	Title       string
+	Description string
+	Before      time.Time
+	After       time.Time
+}
+
+// AND (@emptyTitle::bool OR posts.title LIKE @title)
+// AND (@emptyDescription::bool OR posts.title LIKE @description)
+func (q *Queries) FilterUserPosts(ctx context.Context, arg FilterUserPostsParams) ([]Post, error) {
+	rows, err := q.db.QueryContext(ctx, filterUserPosts,
+		arg.UserID,
+		arg.Limit,
+		arg.Title,
+		arg.Description,
+		arg.Before,
+		arg.After,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Post
+	for rows.Next() {
+		var i Post
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Title,
+			&i.Description,
+			&i.PublishedAt,
+			&i.Url,
+			&i.FeedID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getUserPosts = `-- name: GetUserPosts :many
 SELECT posts.id, posts.created_at, posts.updated_at, posts.title, posts.description, posts.published_at, posts.url, posts.feed_id FROM posts
 JOIN feed_follows ON feed_follows.feed_id = posts.feed_id

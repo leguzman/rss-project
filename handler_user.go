@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -48,6 +49,40 @@ func (apiCfg *apiConfig) handlerGetUserPosts(w http.ResponseWriter, r *http.Requ
 	posts, err := apiCfg.DB.GetUserPosts(r.Context(), database.GetUserPostsParams{
 		UserID: user.ID,
 		Limit:  int32(limit),
+	})
+	if err != nil {
+		respondWithError(w, 400, fmt.Sprintf("Couldn't get posts: %v", err))
+		return
+	}
+	response := WrappedSlice{Results: DBPostsToPosts(posts), Size: len(posts)}
+	respondWithJson(w, 200, response)
+}
+
+func (apiCfg *apiConfig) handlerFilterUserPosts(w http.ResponseWriter, r *http.Request, user database.User) {
+	limitStr := r.URL.Query().Get("limit")
+	description := r.URL.Query().Get("description")
+	title := r.URL.Query().Get("title")
+	before, err := time.Parse(time.DateOnly, r.URL.Query().Get("before"))
+	if err != nil {
+		log.Printf("Error parsing before date: %s", err)
+		before = time.Time{}
+	}
+	after, err := time.Parse(time.DateOnly, r.URL.Query().Get("after"))
+	if err != nil {
+		log.Printf("Error parsing after date: %s", err)
+		after = time.Time{}
+	}
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil {
+		limit = 100
+	}
+	posts, err := apiCfg.DB.FilterUserPosts(r.Context(), database.FilterUserPostsParams{
+		UserID:      user.ID,
+		Description: description,
+		Title:       title,
+		Before:      before,
+		After:       after,
+		Limit:       int32(limit),
 	})
 	if err != nil {
 		respondWithError(w, 400, fmt.Sprintf("Couldn't get posts: %v", err))
