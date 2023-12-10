@@ -59,33 +59,46 @@ const filterUserPosts = `-- name: FilterUserPosts :many
 SELECT posts.id, posts.created_at, posts.updated_at, posts.title, posts.description, posts.published_at, posts.url, posts.feed_id FROM posts
 JOIN feed_follows ON feed_follows.feed_id = posts.feed_id
 WHERE feed_follows.user_id=$1
-AND ($3::text = '' OR posts.title ILIKE '%' || $3 || '%')
-AND ($4::text = '' OR posts.description ILIKE '%' || $4 || '%')
-AND ($5::TIMESTAMP = '0001-01-01' OR posts.published_at <= $5 )
-AND ($6::TIMESTAMP = '0001-01-01' OR posts.published_at >= $6 )
-ORDER BY posts.published_at
+AND ($4::text = '' OR posts.title ILIKE '%' || $4 || '%')
+AND ($5::text = '' OR posts.description ILIKE '%' || $5 || '%')
+AND ($6::TIMESTAMP = '0001-01-01' OR posts.published_at <= $6 )
+AND ($7::TIMESTAMP = '0001-01-01' OR posts.published_at >= $7 )
+ORDER BY
+  CASE WHEN $8::bool THEN posts.title END asc,
+  CASE WHEN $9::bool THEN posts.title END desc,
+  CASE WHEN $10::bool THEN posts.description END desc,
+  CASE WHEN $11::bool THEN posts.description END asc
 LIMIT $2
+OFFSET $3
 `
 
 type FilterUserPostsParams struct {
-	UserID      uuid.UUID
-	Limit       int32
-	Title       string
-	Description string
-	Before      time.Time
-	After       time.Time
+	UserID          uuid.UUID
+	Limit           int32
+	Offset          int32
+	Title           string
+	Description     string
+	Before          time.Time
+	After           time.Time
+	TitleAsc        bool
+	TitleDesc       bool
+	DescriptionDesc bool
+	DescriptionAsc  bool
 }
 
-// AND (@emptyTitle::bool OR posts.title LIKE @title)
-// AND (@emptyDescription::bool OR posts.title LIKE @description)
 func (q *Queries) FilterUserPosts(ctx context.Context, arg FilterUserPostsParams) ([]Post, error) {
 	rows, err := q.db.QueryContext(ctx, filterUserPosts,
 		arg.UserID,
 		arg.Limit,
+		arg.Offset,
 		arg.Title,
 		arg.Description,
 		arg.Before,
 		arg.After,
+		arg.TitleAsc,
+		arg.TitleDesc,
+		arg.DescriptionDesc,
+		arg.DescriptionAsc,
 	)
 	if err != nil {
 		return nil, err

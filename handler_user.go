@@ -60,8 +60,10 @@ func (apiCfg *apiConfig) handlerGetUserPosts(w http.ResponseWriter, r *http.Requ
 
 func (apiCfg *apiConfig) handlerFilterUserPosts(w http.ResponseWriter, r *http.Request, user database.User) {
 	limitStr := r.URL.Query().Get("limit")
+	offsetStr := r.URL.Query().Get("offset")
 	description := r.URL.Query().Get("description")
 	title := r.URL.Query().Get("title")
+	sortColumn := r.URL.Query().Get("sortColumn")
 	before, err := time.Parse(time.DateOnly, r.URL.Query().Get("before"))
 	if err != nil {
 		log.Printf("Error parsing before date: %s", err)
@@ -76,13 +78,22 @@ func (apiCfg *apiConfig) handlerFilterUserPosts(w http.ResponseWriter, r *http.R
 	if err != nil {
 		limit = 100
 	}
+	offset, err := strconv.Atoi(offsetStr)
+	if err != nil {
+		offset = 0
+	}
 	posts, err := apiCfg.DB.FilterUserPosts(r.Context(), database.FilterUserPostsParams{
-		UserID:      user.ID,
-		Description: description,
-		Title:       title,
-		Before:      before,
-		After:       after,
-		Limit:       int32(limit),
+		UserID:          user.ID,
+		Description:     description,
+		Title:           title,
+		Before:          before,
+		After:           after,
+		TitleAsc:        sortColumn == " title",
+		TitleDesc:       sortColumn == "-title",
+		DescriptionAsc:  sortColumn == " description",
+		DescriptionDesc: sortColumn == "-description",
+		Limit:           int32(limit),
+		Offset:          int32(offset),
 	})
 	if err != nil {
 		respondWithError(w, 400, fmt.Sprintf("Couldn't get posts: %v", err))
