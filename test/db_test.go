@@ -1,7 +1,6 @@
 package main
 
 import (
-    "github.com/leguzman/rss-project/routes"
 	"database/sql"
 	"fmt"
 	"net/http"
@@ -10,6 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leguzman/rss-project/handlers"
+	"github.com/leguzman/rss-project/internal/database"
+	"github.com/leguzman/rss-project/routes"
 	_ "github.com/lib/pq"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
@@ -78,9 +80,25 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func TestRealbob(t *testing.T) {
-	// all tests
+func TestHelloWorld(t *testing.T) {
+
+	// Create a New Server Struct
+	s := &http.Server{
+		Handler: routes.GetRouter(handlers.ApiConfig{DB: database.New(db)}),
+	}
+
+	// Create a New Request
+	req, _ := http.NewRequest("GET", "/", nil)
+
+	// Execute Request
+	response := executeRequest(req, s)
+
+	// Check the response code
+	checkResponseCode(t, http.StatusOK, response.Code)
+
+	// We can use testify/require to assert values, as it is more convenient
 }
+
 // executeRequest, creates a new ResponseRecorder
 // then executes the request by calling ServeHTTP in the router
 // after which the handler writes the response to the response recorder
@@ -98,23 +116,3 @@ func checkResponseCode(t *testing.T, expected, actual int) {
 		t.Errorf("Expected response code %d. Got %d\n", expected, actual)
 	}
 }
-
-func TestHelloWorld(t *testing.T) {
-
-	// Create a New Server Struct
-	s := &http.Server{
-		Handler: main.GetRouter(interface{}),
-	}
-
-    // Create a New Request
-	req, _ := http.NewRequest("GET", "/", nil)
-
-	// Execute Request
-	response := executeRequest(req, s)
-
-	// Check the response code
-	checkResponseCode(t, http.StatusOK, response.Code)
-
-	// We can use testify/require to assert values, as it is more convenient
-}
-
