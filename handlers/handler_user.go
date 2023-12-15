@@ -1,4 +1,4 @@
-package main
+package handlers
 
 import (
 	"encoding/json"
@@ -10,9 +10,10 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/leguzman/rss-project/internal/database"
+	"github.com/leguzman/rss-project/models"
 )
 
-func (apiCfg *apiConfig) handlerCreateUser(w http.ResponseWriter, r *http.Request) {
+func (apiCfg *ApiConfig) HandlerCreateUser(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
 		Name string `json:"name"`
 	}
@@ -33,14 +34,14 @@ func (apiCfg *apiConfig) handlerCreateUser(w http.ResponseWriter, r *http.Reques
 		respondWithError(w, 400, fmt.Sprintf("Create user err: %v", err))
 		return
 	}
-	respondWithJson(w, 201, DBUserToUser(user))
+	respondWithJson(w, 201, models.DBUserToUser(user))
 }
 
-func (apiCfg *apiConfig) handlerGetUser(w http.ResponseWriter, r *http.Request, user database.User) {
-	respondWithJson(w, 200, DBUserToUser(user))
+func (apiCfg *ApiConfig) HandlerGetUser(w http.ResponseWriter, r *http.Request, user database.User) {
+	respondWithJson(w, 200, models.DBUserToUser(user))
 }
 
-func (apiCfg *apiConfig) handlerGetUserPosts(w http.ResponseWriter, r *http.Request, user database.User) {
+func (apiCfg *ApiConfig) HandlerGetUserPosts(w http.ResponseWriter, r *http.Request, user database.User) {
 	limitStr := r.URL.Query().Get("limit")
 	limit, err := strconv.Atoi(limitStr)
 	if err != nil {
@@ -54,11 +55,11 @@ func (apiCfg *apiConfig) handlerGetUserPosts(w http.ResponseWriter, r *http.Requ
 		respondWithError(w, 400, fmt.Sprintf("Couldn't get posts: %v", err))
 		return
 	}
-	response := WrappedSlice{Results: DBPostsToPosts(posts), Size: len(posts)}
+	response := WrappedSlice{Results: models.DBPostsToPosts(posts), Size: len(posts)}
 	respondWithJson(w, 200, response)
 }
 
-func (apiCfg *apiConfig) handlerFilterUserPosts(w http.ResponseWriter, r *http.Request, user database.User) {
+func (apiCfg *ApiConfig) HandlerFilterUserPosts(w http.ResponseWriter, r *http.Request, user database.User) {
 	limitStr := r.URL.Query().Get("limit")
 	offsetStr := r.URL.Query().Get("offset")
 	description := r.URL.Query().Get("description")
@@ -99,6 +100,6 @@ func (apiCfg *apiConfig) handlerFilterUserPosts(w http.ResponseWriter, r *http.R
 		respondWithError(w, 400, fmt.Sprintf("Couldn't get posts: %v", err))
 		return
 	}
-	response := WrappedSlice{Results: DBPostsToPosts(posts), Size: len(posts)}
+	response := WrappedSlice{Results: models.DBPostsToPosts(posts), Size: len(posts)}
 	respondWithJson(w, 200, response)
 }

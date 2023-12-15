@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/leguzman/rss-project/handlers"
 	"github.com/leguzman/rss-project/internal/database"
 )
 
@@ -43,7 +44,7 @@ func scrapeFeed(db *database.Queries, wg *sync.WaitGroup, feed database.Feed) {
 		log.Println("Error marking feed:", err)
 		return
 	}
-	rssFeed, err := urlToFeed(feed.Url)
+	rssFeed, err := handlers.UrlToFeed(feed.Url)
 	if err != nil {
 		log.Println("Error fetching feed:", feed)
 		return

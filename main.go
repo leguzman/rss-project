@@ -9,21 +9,14 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/leguzman/rss-project/handlers"
 	"github.com/leguzman/rss-project/internal/database"
+	"github.com/leguzman/rss-project/routes"
 	_ "github.com/lib/pq"
 )
 
-type apiConfig struct {
-	DB *database.Queries
-}
 
 func main() {
-	//	feed, err := urlToFeed("https://wagslane.dev/index.xml")
-	//	if err != nil {
-	//		log.Fatal(err)
-	//	}
-	//	fmt.Println(feed)
-
 	godotenv.Load()
 	port := os.Getenv("PORT")
 	fmt.Println("Port: ", port)
@@ -32,13 +25,13 @@ func main() {
 		log.Fatal("Can't connect to database: ", err)
 	}
 
-	apiCfg := apiConfig{
+	apiCfg := handlers.ApiConfig{
 		DB: database.New(conn),
 	}
 	go startScraping(apiCfg.DB, 10, time.Minute)
 
 	server := &http.Server{
-		Handler: getRouter(apiCfg),
+		Handler: routes.GetRouter(apiCfg),
 		Addr:    ":" + port,
 	}
 

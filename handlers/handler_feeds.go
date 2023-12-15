@@ -1,4 +1,4 @@
-package main
+package handlers
 
 import (
 	"encoding/json"
@@ -8,9 +8,10 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/leguzman/rss-project/internal/database"
+	"github.com/leguzman/rss-project/models"
 )
 
-func (apiCfg *apiConfig) handlerCreateFeed(w http.ResponseWriter, r *http.Request, user database.User) {
+func (apiCfg *ApiConfig) HandlerCreateFeed(w http.ResponseWriter, r *http.Request, user database.User) {
 	type parameters struct {
 		Name string `json:"name"`
 		URL  string `json:"url"`
@@ -34,14 +35,14 @@ func (apiCfg *apiConfig) handlerCreateFeed(w http.ResponseWriter, r *http.Reques
 		respondWithError(w, 400, fmt.Sprintf("Create user err: %v", err))
 		return
 	}
-	respondWithJson(w, 201, DBFeedToFeed(feed))
+	respondWithJson(w, 201, models.DBFeedToFeed(feed))
 }
-func (apiCfg *apiConfig) handlerGetFeeds(w http.ResponseWriter, r *http.Request) {
+func (apiCfg *ApiConfig) HandlerGetFeeds(w http.ResponseWriter, r *http.Request) {
 	feeds, err := apiCfg.DB.GetFeeds(r.Context())
 	if err != nil {
 		respondWithError(w, 400, fmt.Sprintf("Couldn't get feeds: %v", err))
 		return
 	}
-	response := WrappedSlice{Results: DBFeedsToFeeds(feeds), Size: len(feeds)}
+	response := WrappedSlice{Results: models.DBFeedsToFeeds(feeds), Size: len(feeds)}
 	respondWithJson(w, 200, response)
 }

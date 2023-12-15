@@ -1,4 +1,4 @@
-package main
+package handlers
 
 import (
 	"fmt"
@@ -8,9 +8,9 @@ import (
 	"github.com/leguzman/rss-project/internal/database"
 )
 
-type authedHandler func(http.ResponseWriter, *http.Request, database.User)
+type AuthedHandler func(http.ResponseWriter, *http.Request, database.User)
 
-func (apiCfg *apiConfig) middlewareAuth(handler authedHandler) http.HandlerFunc {
+func (apiCfg *ApiConfig) MiddlewareAuth(handler AuthedHandler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		apiKey, err := auth.GetApiKey(r.Header)
 		if err != nil {
