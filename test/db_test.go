@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"database/sql"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
+	"strings"
 	"testing"
 	"time"
 
@@ -16,6 +19,7 @@ import (
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
 	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 )
 
 var db *sql.DB
@@ -69,6 +73,22 @@ func TestMain(m *testing.M) {
 	}); err != nil {
 		log.Fatalf("Could not connect to docker: %s", err)
 	}
+	// Run migrations
+	var args = []string{
+		"postgres",
+		databaseUrl,
+		"up",
+	}
+
+	exe := exec.Command("goose", args...)
+	log.Print(exe)
+	dir, _ := os.Getwd()
+	exe.Dir = strings.Split(dir, "db_test.go")[0] + "/../sql/schema"
+	log.Print(exe.Dir)
+
+	output := exe.Run()
+	fmt.Println(output)
+
 	//Run tests
 	code := m.Run()
 
@@ -88,7 +108,7 @@ func TestHelloWorld(t *testing.T) {
 	}
 
 	// Create a New Request
-	req, _ := http.NewRequest("GET", "/", nil)
+	req, _ := http.NewRequest(http.MethodGet, "/", nil)
 
 	// Execute Request
 	response := executeRequest(req, s)
@@ -96,6 +116,26 @@ func TestHelloWorld(t *testing.T) {
 	// Check the response code
 	checkResponseCode(t, http.StatusOK, response.Code)
 
+	// Create a New Request
+	req, _ = http.NewRequest(http.MethodGet, "/v1/healthz", nil)
+
+	// Execute Request
+	response = executeRequest(req, s)
+
+	// Check the response code
+	checkResponseCode(t, http.StatusOK, response.Code)
+
+	// Create a New Request
+	jsonBody := []byte(`{"name": "Luis"}`)
+	bodyReader := bytes.NewReader(jsonBody)
+	req, _ = http.NewRequest(http.MethodPost, "/v1/users", bodyReader)
+
+	// Execute Request
+	response = executeRequest(req, s)
+
+	// Check the response code
+	checkResponseCode(t, http.StatusCreated, response.Code)
+	assert.Contains(t, string(response.Body.Bytes()), `"name":"Luis"`)
 	// We can use testify/require to assert values, as it is more convenient
 }
 

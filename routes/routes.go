@@ -9,7 +9,6 @@ import (
 	"github.com/leguzman/rss-project/handlers"
 )
 
-
 func GetRouter(apiCfg handlers.ApiConfig) chi.Router {
 	router := chi.NewRouter()
 	router.Use(middleware.Logger)
