@@ -225,7 +225,7 @@ func TestUserHandler(t *testing.T) {
 	checkResponseCode(t, http.StatusOK, response.Code)
 	assert.Contains(t, response.Body.String(), post.ID.String())
 
-	req, _ = http.NewRequest(http.MethodGet, "/v1/posts?limit=1", nil)
+	req, _ = http.NewRequest(http.MethodGet, "/v1/post", nil)
 	req.Header.Add("Authorization", apiKey)
 
 	response = executeRequest(req, server)
