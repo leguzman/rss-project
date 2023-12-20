@@ -6,9 +6,9 @@ import (
 	"net/http"
 )
 
-type WrappedSlice struct {
-	Results interface{} `json:"results"`
-	Size    int         `json:"size"`
+type WrappedSlice[T any] struct {
+	Results []T `json:"results"`
+	Size    int `json:"size"`
 }
 
 func respondWithJson(w http.ResponseWriter, code int, payload interface{}) {

@@ -55,7 +55,7 @@ func (apiCfg *ApiConfig) HandlerGetUserPosts(w http.ResponseWriter, r *http.Requ
 		respondWithError(w, 400, fmt.Sprintf("Couldn't get posts: %v", err))
 		return
 	}
-	response := WrappedSlice{Results: models.DBPostsToPosts(posts), Size: len(posts)}
+	response := WrappedSlice[models.Post]{Results: models.DBPostsToPosts(posts), Size: len(posts)}
 	respondWithJson(w, 200, response)
 }
 
@@ -100,6 +100,6 @@ func (apiCfg *ApiConfig) HandlerFilterUserPosts(w http.ResponseWriter, r *http.R
 		respondWithError(w, 400, fmt.Sprintf("Couldn't get posts: %v", err))
 		return
 	}
-	response := WrappedSlice{Results: models.DBPostsToPosts(posts), Size: len(posts)}
+	response := WrappedSlice[models.Post]{Results: models.DBPostsToPosts(posts), Size: len(posts)}
 	respondWithJson(w, 200, response)
 }

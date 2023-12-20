@@ -1,9 +1,12 @@
-package main
+package test
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -12,8 +15,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/leguzman/rss-project/handlers"
 	"github.com/leguzman/rss-project/internal/database"
+	"github.com/leguzman/rss-project/models"
 	"github.com/leguzman/rss-project/routes"
 	_ "github.com/lib/pq"
 	"github.com/ory/dockertest/v3"
@@ -23,8 +28,10 @@ import (
 )
 
 var db *sql.DB
+var server *http.Server
 
 func TestMain(m *testing.M) {
+
 	// uses a sensible default on windows (tcp/http) and linux/osx (socket)
 	pool, err := dockertest.NewPool("")
 	if err != nil {
@@ -100,57 +107,146 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func TestHelloWorld(t *testing.T) {
-
-	// Create a New Server Struct
-	s := &http.Server{
+func TestHealthAndRoot(t *testing.T) {
+	server = &http.Server{
 		Handler: routes.GetRouter(handlers.ApiConfig{DB: database.New(db)}),
 	}
-
-	// Create a New Request
 	req, _ := http.NewRequest(http.MethodGet, "/", nil)
-
-	// Execute Request
-	response := executeRequest(req, s)
-
-	// Check the response code
+	response := executeRequest(req, server)
 	checkResponseCode(t, http.StatusOK, response.Code)
 
-	// Create a New Request
 	req, _ = http.NewRequest(http.MethodGet, "/v1/healthz", nil)
-
-	// Execute Request
-	response = executeRequest(req, s)
-
-	// Check the response code
+	response = executeRequest(req, server)
 	checkResponseCode(t, http.StatusOK, response.Code)
-
-	// Create a New Request
-	jsonBody := []byte(`{"name": "Luis"}`)
-	bodyReader := bytes.NewReader(jsonBody)
-	req, _ = http.NewRequest(http.MethodPost, "/v1/users", bodyReader)
-
-	// Execute Request
-	response = executeRequest(req, s)
-
-	// Check the response code
-	checkResponseCode(t, http.StatusCreated, response.Code)
-	assert.Contains(t, string(response.Body.Bytes()), `"name":"Luis"`)
-	// We can use testify/require to assert values, as it is more convenient
 }
 
-// executeRequest, creates a new ResponseRecorder
-// then executes the request by calling ServeHTTP in the router
-// after which the handler writes the response to the response recorder
-// which we can then inspect.
+func TestUserHandler(t *testing.T) {
+	queries := database.New(db)
+	server = &http.Server{
+		Handler: routes.GetRouter(handlers.ApiConfig{DB: queries}),
+	}
+	jsonBody := []byte(`{"name": "Luis"}`)
+	bodyReader := bytes.NewReader(jsonBody)
+	req, _ := http.NewRequest(http.MethodPost, "/v1/users", bodyReader)
+	response := executeRequest(req, server)
+
+	checkResponseCode(t, http.StatusCreated, response.Code)
+	assert.Contains(t, response.Body.String(), `"name":"Luis"`)
+
+	user := models.User{}
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		log.Fatal("Couldn't read user!")
+	}
+	err = json.Unmarshal(body, &user)
+
+	if err != nil {
+		log.Fatal("Couldn't read user!")
+	}
+	apiKey := "ApiKey " + user.APIKey
+	req, _ = http.NewRequest(http.MethodGet, "/v1/users", nil)
+	req.Header.Add("Authorization", apiKey)
+
+	response = executeRequest(req, server)
+	checkResponseCode(t, http.StatusOK, response.Code)
+
+	jsonBody = []byte(`
+	{
+		"name": "Wags Lane's Blog",
+		"url":"https://wagslane.dev/index.xml"
+	}`)
+	bodyReader = bytes.NewReader(jsonBody)
+	req, _ = http.NewRequest(http.MethodPost, "/v1/feeds", bodyReader)
+	req.Header.Add("Authorization", apiKey)
+
+	response = executeRequest(req, server)
+	checkResponseCode(t, http.StatusCreated, response.Code)
+	assert.Contains(t, response.Body.String(), `"name":"Wags Lane's Blog"`)
+
+	feed := models.Feed{}
+	body, err = io.ReadAll(response.Body)
+	if err != nil {
+		log.Fatal("Couldn't read feed!")
+	}
+	err = json.Unmarshal(body, &feed)
+
+	if err != nil {
+		log.Fatal("Couldn't read feed!")
+	}
+
+	req, _ = http.NewRequest(http.MethodGet, "/v1/feeds", nil)
+	req.Header.Add("Authorization", apiKey)
+
+	response = executeRequest(req, server)
+	checkResponseCode(t, http.StatusOK, response.Code)
+
+	jsonBody = []byte(fmt.Sprintf(`
+	{
+		"feed_id": "%s"
+	}`, feed.ID))
+	bodyReader = bytes.NewReader(jsonBody)
+	req, _ = http.NewRequest(http.MethodPost, "/v1/feed_follows", bodyReader)
+	req.Header.Add("Authorization", apiKey)
+	response = executeRequest(req, server)
+	checkResponseCode(t, http.StatusCreated, response.Code)
+	assert.Contains(t, response.Body.String(), feed.ID.String())
+
+	req, _ = http.NewRequest(http.MethodGet, "/v1/feed_follows", nil)
+	req.Header.Add("Authorization", apiKey)
+	response = executeRequest(req, server)
+	checkResponseCode(t, http.StatusOK, response.Code)
+	assert.Contains(t, response.Body.String(), feed.ID.String())
+	log.Printf("FeedFollow: %v", response.Body.String())
+
+	body, err = io.ReadAll(response.Body)
+	if err != nil {
+		log.Fatal("Couldn't read response body!")
+	}
+	result := handlers.WrappedSlice[models.FeedFollow]{}
+	json.Unmarshal(body, &result)
+
+	post, err := queries.CreatePost(context.Background(), database.CreatePostParams{
+		ID:          uuid.New(),
+		CreatedAt:   time.Now().UTC(),
+		UpdatedAt:   time.Now().UTC(),
+		Title:       "Test Post",
+		Description: sql.NullString{String: "Test Desc"},
+		PublishedAt: time.Now().UTC(),
+		Url:         "test link",
+		FeedID:      feed.ID,
+	})
+	if err != nil {
+		log.Fatal("Couldn't populate Db with posts!")
+	}
+	req, _ = http.NewRequest(http.MethodGet, "/v1/posts", nil)
+	req.Header.Add("Authorization", apiKey)
+
+	response = executeRequest(req, server)
+	checkResponseCode(t, http.StatusOK, response.Code)
+	assert.Contains(t, response.Body.String(), post.ID.String())
+
+	req, _ = http.NewRequest(http.MethodGet, "/v1/posts?limit=1", nil)
+	req.Header.Add("Authorization", apiKey)
+
+	response = executeRequest(req, server)
+	checkResponseCode(t, http.StatusOK, response.Code)
+	assert.Contains(t, response.Body.String(), post.ID.String())
+
+	req, _ = http.NewRequest(http.MethodDelete, fmt.Sprintf("/v1/feed_follows/%s", result.Results[0].ID.String()), nil)
+	log.Info(req.URL)
+	req.Header.Add("Authorization", apiKey)
+
+	response = executeRequest(req, server)
+	assert.Equal(t, response.Body.String(), "{}")
+	checkResponseCode(t, http.StatusNoContent, response.Code)
+}
+
 func executeRequest(req *http.Request, s *http.Server) *httptest.ResponseRecorder {
 	rr := httptest.NewRecorder()
 	s.Handler.ServeHTTP(rr, req)
 	return rr
 }
 
-// checkResponseCode is a simple utility to check the response code
-// of the response
 func checkResponseCode(t *testing.T, expected, actual int) {
 	if expected != actual {
 		t.Errorf("Expected response code %d. Got %d\n", expected, actual)

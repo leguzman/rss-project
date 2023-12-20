@@ -43,6 +43,6 @@ func (apiCfg *ApiConfig) HandlerGetFeeds(w http.ResponseWriter, r *http.Request)
 		respondWithError(w, 400, fmt.Sprintf("Couldn't get feeds: %v", err))
 		return
 	}
-	response := WrappedSlice{Results: models.DBFeedsToFeeds(feeds), Size: len(feeds)}
+	response := WrappedSlice[models.Feed]{Results: models.DBFeedsToFeeds(feeds), Size: len(feeds)}
 	respondWithJson(w, 200, response)
 }

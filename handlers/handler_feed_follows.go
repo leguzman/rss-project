@@ -43,12 +43,12 @@ func (apiCfg *ApiConfig) HandlerGetFeedFollows(w http.ResponseWriter, r *http.Re
 		respondWithError(w, 400, fmt.Sprintf("Get Feed follows err: %v", err))
 		return
 	}
-	response := WrappedSlice{Results: models.DBFeedFollowsToFeedFollows(feedFollows), Size: len(feedFollows)}
+	response := WrappedSlice[models.FeedFollow]{Results: models.DBFeedFollowsToFeedFollows(feedFollows), Size: len(feedFollows)}
 	respondWithJson(w, 200, response)
 }
 
 func (apiCfg *ApiConfig) HandlerDeleteFeedFollow(w http.ResponseWriter, r *http.Request, user database.User) {
-	feedFellowIDStr := chi.URLParam(r, "feedFellowID")
+	feedFellowIDStr := chi.URLParam(r, "feedFollowID")
 	feedFollowID, err := uuid.Parse(feedFellowIDStr)
 	if err != nil {
 		respondWithError(w, 400, fmt.Sprintf("Couldn't parse feed follow id: %v", err))

@@ -2,3 +2,4 @@
 rss-project
 .env
 vendor/
+coverage/
