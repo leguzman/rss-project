@@ -15,7 +15,6 @@ import (
 	_ "github.com/lib/pq"
 )
 
-
 func main() {
 	godotenv.Load()
 	port := os.Getenv("PORT")
