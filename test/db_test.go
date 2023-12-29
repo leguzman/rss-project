@@ -29,11 +29,14 @@ import (
 
 var db *sql.DB
 var server *http.Server
+var apiKey string
+var	feed models.Feed
+var result handlers.WrappedSlice[models.FeedFollow]
 
 func TestMain(m *testing.M) {
 
 	// uses a sensible default on windows (tcp/http) and linux/osx (socket)
-	pool, err := dockertest.NewPool("")
+	pool, err := dockertest.NewPool("unix:///run/docker.sock")
 	if err != nil {
 		log.Fatalf("Could not construct pool: %s", err)
 	}
@@ -120,15 +123,18 @@ func TestHealthAndRoot(t *testing.T) {
 	checkResponseCode(t, http.StatusOK, response.Code)
 }
 
+func createUser(name string)(req *http.Request){
+	jsonBody := []byte(`{"name": "`+name+`"}`)
+	bodyReader := bytes.NewReader(jsonBody)
+	req, _ = http.NewRequest(http.MethodPost, "/v1/users", bodyReader)
+    return
+}
 func TestUserHandler(t *testing.T) {
 	queries := database.New(db)
 	server = &http.Server{
 		Handler: routes.GetRouter(handlers.ApiConfig{DB: queries}),
 	}
-	jsonBody := []byte(`{"name": "Luis"}`)
-	bodyReader := bytes.NewReader(jsonBody)
-	req, _ := http.NewRequest(http.MethodPost, "/v1/users", bodyReader)
-	response := executeRequest(req, server)
+	response := executeRequest(createUser("Luis"), server)
 
 	checkResponseCode(t, http.StatusCreated, response.Code)
 	assert.Contains(t, response.Body.String(), `"name":"Luis"`)
@@ -143,28 +149,36 @@ func TestUserHandler(t *testing.T) {
 	if err != nil {
 		log.Fatal("Couldn't read user!")
 	}
-	apiKey := "ApiKey " + user.APIKey
-	req, _ = http.NewRequest(http.MethodGet, "/v1/users", nil)
+	apiKey = "ApiKey " + user.APIKey
+    req, _ := http.NewRequest(http.MethodGet, "/v1/users", nil)
 	req.Header.Add("Authorization", apiKey)
 
 	response = executeRequest(req, server)
 	checkResponseCode(t, http.StatusOK, response.Code)
 
-	jsonBody = []byte(`
+
+}
+
+
+func TestFeedsHandler(t *testing.T){
+	queries := database.New(db)
+    server:= &http.Server{
+        Handler: routes.GetRouter(handlers.ApiConfig{DB: queries}),
+    }
+    jsonBody := []byte(`
 	{
-		"name": "Wags Lane's Blog",
-		"url":"https://wagslane.dev/index.xml"
+		"name": "Wags Lane's Blog 2",
+		"url":"https://boot.dev/index.xml"
 	}`)
-	bodyReader = bytes.NewReader(jsonBody)
-	req, _ = http.NewRequest(http.MethodPost, "/v1/feeds", bodyReader)
+    bodyReader := bytes.NewReader(jsonBody)
+    req, _ := http.NewRequest(http.MethodPost, "/v1/feeds", bodyReader)
 	req.Header.Add("Authorization", apiKey)
 
-	response = executeRequest(req, server)
+    response := executeRequest(req, server)
 	checkResponseCode(t, http.StatusCreated, response.Code)
-	assert.Contains(t, response.Body.String(), `"name":"Wags Lane's Blog"`)
+	assert.Contains(t, response.Body.String(), `"name":"Wags Lane's Blog 2"`)
 
-	feed := models.Feed{}
-	body, err = io.ReadAll(response.Body)
+    body, err := io.ReadAll(response.Body)
 	if err != nil {
 		log.Fatal("Couldn't read feed!")
 	}
@@ -180,14 +194,19 @@ func TestUserHandler(t *testing.T) {
 	response = executeRequest(req, server)
 	checkResponseCode(t, http.StatusOK, response.Code)
 
-	jsonBody = []byte(fmt.Sprintf(`
+}
+
+func TestFeedFollowsHandler(t *testing.T){
+    jsonBody := []byte(fmt.Sprintf(`
 	{
 		"feed_id": "%s"
 	}`, feed.ID))
-	bodyReader = bytes.NewReader(jsonBody)
-	req, _ = http.NewRequest(http.MethodPost, "/v1/feed_follows", bodyReader)
+    bodyReader := bytes.NewReader(jsonBody)
+    req, _ := http.NewRequest(http.MethodPost, "/v1/feed_follows", bodyReader)
 	req.Header.Add("Authorization", apiKey)
-	response = executeRequest(req, server)
+    response := executeRequest(req, server)
+
+
 	checkResponseCode(t, http.StatusCreated, response.Code)
 	assert.Contains(t, response.Body.String(), feed.ID.String())
 
@@ -198,12 +217,36 @@ func TestUserHandler(t *testing.T) {
 	assert.Contains(t, response.Body.String(), feed.ID.String())
 	log.Printf("FeedFollow: %v", response.Body.String())
 
-	body, err = io.ReadAll(response.Body)
+    body, err := io.ReadAll(response.Body)
 	if err != nil {
 		log.Fatal("Couldn't read response body!")
 	}
-	result := handlers.WrappedSlice[models.FeedFollow]{}
+	result = handlers.WrappedSlice[models.FeedFollow]{}
 	json.Unmarshal(body, &result)
+
+	req, _ = http.NewRequest(http.MethodDelete, fmt.Sprintf("/v1/feed_follows/%s", result.Results[0].ID.String()), nil)
+	log.Info(req.URL)
+	req.Header.Add("Authorization", apiKey)
+
+	response = executeRequest(req, server)
+	assert.Equal(t, response.Body.String(), "{}")
+	checkResponseCode(t, http.StatusNoContent, response.Code)
+}
+
+func TestUserPosts(t *testing.T){
+	queries := database.New(db)
+    jsonBody := []byte(fmt.Sprintf(`
+	{
+		"feed_id": "%s"
+	}`, feed.ID))
+    bodyReader := bytes.NewReader(jsonBody)
+    req, _ := http.NewRequest(http.MethodPost, "/v1/feed_follows", bodyReader)
+	req.Header.Add("Authorization", apiKey)
+    response := executeRequest(req, server)
+
+
+	checkResponseCode(t, http.StatusCreated, response.Code)
+	assert.Contains(t, response.Body.String(), feed.ID.String())
 
 	post, err := queries.CreatePost(context.Background(), database.CreatePostParams{
 		ID:          uuid.New(),
@@ -218,10 +261,10 @@ func TestUserHandler(t *testing.T) {
 	if err != nil {
 		log.Fatal("Couldn't populate Db with posts!")
 	}
-	req, _ = http.NewRequest(http.MethodGet, "/v1/posts", nil)
+    req, _ = http.NewRequest(http.MethodGet, "/v1/posts", nil)
 	req.Header.Add("Authorization", apiKey)
 
-	response = executeRequest(req, server)
+    response = executeRequest(req, server)
 	checkResponseCode(t, http.StatusOK, response.Code)
 	assert.Contains(t, response.Body.String(), post.ID.String())
 
@@ -231,18 +274,11 @@ func TestUserHandler(t *testing.T) {
 	response = executeRequest(req, server)
 	checkResponseCode(t, http.StatusOK, response.Code)
 	assert.Contains(t, response.Body.String(), post.ID.String())
-
-	req, _ = http.NewRequest(http.MethodDelete, fmt.Sprintf("/v1/feed_follows/%s", result.Results[0].ID.String()), nil)
-	log.Info(req.URL)
-	req.Header.Add("Authorization", apiKey)
-
-	response = executeRequest(req, server)
-	assert.Equal(t, response.Body.String(), "{}")
-	checkResponseCode(t, http.StatusNoContent, response.Code)
 }
 
+
 func executeRequest(req *http.Request, s *http.Server) *httptest.ResponseRecorder {
-	rr := httptest.NewRecorder()
+    rr := httptest.NewRecorder()
 	s.Handler.ServeHTTP(rr, req)
 	return rr
 }

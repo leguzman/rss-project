@@ -3,3 +3,4 @@ rss-project
 .env
 vendor/
 coverage/
+nvim*
